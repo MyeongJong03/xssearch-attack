@@ -1,0 +1,8 @@
+{
+  "name": "myeongjong03/xssearch-attack",
+  "description": "Temporary Automad package branch for CTF testing",
+  "type": "automad-package",
+  "require": {
+    "automad/package-installer": ">=1.1"
+  }
+}
