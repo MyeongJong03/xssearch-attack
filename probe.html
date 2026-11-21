@@ -8,8 +8,8 @@
 <pre id="out"></pre>
 <script>
 const callback = "https://webhook.site/2552eebc-b08c-488d-bd60-90fefaa9aa21";
-document.getElementById("url").value = location.href.split("?")[0] + "?run=1";
-if (location.search.includes("run=1")) (async () => {
+document.getElementById("url").value = location.href.split("#")[0] + "#run=1";
+if (location.hash.includes("run=1")) (async () => {
   const out = {ua:navigator.userAgent, results:[], events:[]};
   const send = async () => {
     document.getElementById("out").textContent = JSON.stringify(out, null, 2);
