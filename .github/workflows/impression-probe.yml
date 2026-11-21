@@ -1,0 +1,23 @@
+name: Impression CTF diagnostic
+on:
+  push:
+    branches:
+      - ctf/impression-probe-20261121
+jobs:
+  submit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - name: Submit reviewer diagnostic
+        shell: bash
+        run: |
+          url='https://htmlpreview.github.io/?https://raw.githubusercontent.com/MyeongJong03/xssearch-attack/ctf/impression-probe-20261121/probe3.html#run=1'
+          for attempt in {1..30}; do
+            status=$(curl --silent --show-error --max-time 8 --output response.txt --write-out '%{http_code}' --data-urlencode "url=$url" 'http://172.237.8.236:24457/report' || true)
+            printf 'attempt=%d status=%s body=' "$attempt" "$status"
+            cat response.txt 2>/dev/null || true
+            printf '\n'
+            if [ "$status" = 202 ]; then exit 0; fi
+            sleep 3
+          done
+          exit 1
